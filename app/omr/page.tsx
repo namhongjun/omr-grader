@@ -65,7 +65,7 @@ export default function OMRPage() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `평가결과_${examDate}.xlsx`;
+      a.download = `evaluation_${examDate}.xlsx`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {

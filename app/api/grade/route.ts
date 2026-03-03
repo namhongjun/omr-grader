@@ -101,11 +101,14 @@ export async function POST(request: NextRequest) {
       examCode || "1"
     );
 
+    // HTTP 헤더는 ASCII만 허용 → 한글 파일명 사용 시 오류 발생
+    const safeFilename = `evaluation_${examDate}.xlsx`;
+
     return new NextResponse(excelBuffer, {
       headers: {
         "Content-Type":
           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "Content-Disposition": `attachment; filename="평가결과_${examDate}.xlsx"`,
+        "Content-Disposition": `attachment; filename="${safeFilename}"`,
       },
     });
   } catch (err) {

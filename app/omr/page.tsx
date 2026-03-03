@@ -154,7 +154,7 @@ export default function OMRPage() {
                 value={examCode}
                 onChange={(e) => setExamCode(e.target.value)}
                 placeholder="예: 2024-01"
-                className="w-full rounded border border-slate-300 px-3 py-2 text-sm"
+                className="w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-900 bg-white placeholder:text-slate-400"
               />
             </div>
             <div>
@@ -165,7 +165,7 @@ export default function OMRPage() {
                 type="date"
                 value={examDate}
                 onChange={(e) => setExamDate(e.target.value)}
-                className="w-full rounded border border-slate-300 px-3 py-2 text-sm"
+                className="w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-900 bg-white"
               />
             </div>
             <div>
@@ -176,7 +176,7 @@ export default function OMRPage() {
                 type="text"
                 value={examName}
                 onChange={(e) => setExamName(e.target.value)}
-                className="w-full rounded border border-slate-300 px-3 py-2 text-sm"
+                className="w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-900 bg-white placeholder:text-slate-400"
               />
             </div>
           </div>

@@ -33,10 +33,8 @@ export async function POST(request: NextRequest) {
 
     if (excelFile && excelFile.size > 0) {
       const excelBuf = Buffer.from(await excelFile.arrayBuffer());
-      if (examCode) {
-        const key = parseAnswerKeyFromExcel(excelBuf, examCode);
-        if (key) answerKey = key;
-      }
+      const key = parseAnswerKeyFromExcel(excelBuf, examCode);
+      if (key) answerKey = key;
       examineeList = getExamineeListFromExcel(excelBuf);
     }
 

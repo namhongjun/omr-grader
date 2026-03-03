@@ -7,10 +7,9 @@ import sharp from "sharp";
 const NUM_QUESTIONS = 40;
 const CHOICES_PER_QUESTION = 4;
 
-// OMR 카드: 상단(이름/사번) ~55%, 답안 영역 55%~95%
-// 2열: 왼쪽 1~20번, 오른쪽 21~40번
-const ANSWER_TOP = 0.55;
-const ANSWER_BOTTOM = 0.95;
+// OMR 카드: 답안 영역 (2열: 1~20 왼쪽, 21~40 오른쪽)
+const ANSWER_TOP = 0.48;
+const ANSWER_BOTTOM = 0.93;
 const ROWS_PER_COL = 20;
 
 function getBubblePositions(width: number, height: number) {
@@ -19,9 +18,9 @@ function getBubblePositions(width: number, height: number) {
   const y1 = height * ANSWER_BOTTOM;
   const rowHeight = (y1 - y0) / ROWS_PER_COL;
 
-  // 왼쪽 열: 1~20번
-  const leftX0 = width * 0.08;
-  const leftX1 = width * 0.42;
+  // 왼쪽 열: 1~20번 (범위 확대)
+  const leftX0 = width * 0.06;
+  const leftX1 = width * 0.46;
   const leftColWidth = (leftX1 - leftX0) / CHOICES_PER_QUESTION;
   for (let r = 0; r < ROWS_PER_COL; r++) {
     for (let c = 0; c < CHOICES_PER_QUESTION; c++) {
@@ -32,8 +31,8 @@ function getBubblePositions(width: number, height: number) {
   }
 
   // 오른쪽 열: 21~40번
-  const rightX0 = width * 0.52;
-  const rightX1 = width * 0.92;
+  const rightX0 = width * 0.54;
+  const rightX1 = width * 0.94;
   const rightColWidth = (rightX1 - rightX0) / CHOICES_PER_QUESTION;
   for (let r = 0; r < ROWS_PER_COL; r++) {
     for (let c = 0; c < CHOICES_PER_QUESTION; c++) {
@@ -49,10 +48,10 @@ function getBubblePositions(width: number, height: number) {
 /** 버블 반경 (샘플링 영역) */
 function getBubbleRadius(width: number, height: number): number {
   const minDim = Math.min(width, height);
-  return Math.max(12, Math.floor(minDim * 0.02));
+  return Math.max(15, Math.floor(minDim * 0.025));
 }
 
-/** 원형 영역 내 어두운 픽셀 비율 (raw 버퍼에서 샘플링) */
+/** 원형 영역 내 어두운 픽셀 비율 + 주변 오프셋 샘플링 (위치 오차 보정) */
 function getDarknessFromRaw(
   data: Buffer,
   width: number,
@@ -62,25 +61,34 @@ function getDarknessFromRaw(
   cy: number,
   r: number
 ): number {
-  let dark = 0;
-  let total = 0;
-  const r2 = r * r;
-  for (let dy = -r; dy <= r; dy++) {
-    for (let dx = -r; dx <= r; dx++) {
-      if (dx * dx + dy * dy > r2) continue;
-      const x = Math.round(cx) + dx;
-      const y = Math.round(cy) + dy;
-      if (x < 0 || x >= width || y < 0 || y >= height) continue;
-      const i = (y * width + x) * channels;
-      const rv = data[i];
-      const gv = channels > 1 ? data[i + 1] : rv;
-      const bv = channels > 2 ? data[i + 2] : rv;
-      const gray = 0.299 * rv + 0.587 * gv + 0.114 * bv;
-      total++;
-      if (gray < 200) dark++;
+  const offsets = [[0, 0], [r * 0.3, 0], [-r * 0.3, 0], [0, r * 0.3], [0, -r * 0.3]];
+  let maxDark = 0;
+
+  for (const [ox, oy] of offsets) {
+    const px = Math.round(cx + ox);
+    const py = Math.round(cy + oy);
+    let dark = 0;
+    let total = 0;
+    const r2 = r * r;
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (dx * dx + dy * dy > r2) continue;
+        const x = px + dx;
+        const y = py + dy;
+        if (x < 0 || x >= width || y < 0 || y >= height) continue;
+        const i = (y * width + x) * channels;
+        const rv = data[i];
+        const gv = channels > 1 ? data[i + 1] : rv;
+        const bv = channels > 2 ? data[i + 2] : rv;
+        const gray = 0.299 * rv + 0.587 * gv + 0.114 * bv;
+        total++;
+        if (gray < 220) dark++;
+      }
     }
+    const ratio = total > 0 ? dark / total : 0;
+    if (ratio > maxDark) maxDark = ratio;
   }
-  return total > 0 ? dark / total : 0;
+  return maxDark;
 }
 
 export interface OMRResult {
@@ -90,7 +98,7 @@ export interface OMRResult {
 
 export async function readOMRFromBuffer(
   buffer: Buffer,
-  filledThreshold = 0.32
+  filledThreshold = 0.25
 ): Promise<OMRResult> {
   const image = sharp(buffer);
   const meta = await image.metadata();
@@ -105,7 +113,9 @@ export async function readOMRFromBuffer(
     image.resize(w, h);
   }
 
+  // 대비 강화 (마킹 인식 개선)
   const { data, info } = await image
+    .normalize()
     .raw()
     .toBuffer({ resolveWithObject: true });
   const channels = info.channels;

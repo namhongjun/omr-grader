@@ -1,46 +1,55 @@
 /**
  * 템플릿 기반 OMR 읽기 (Node.js / Vercel)
- * 40문항 4지선다, 버블 위치를 비율로 정의
+ * 40문항 4지선다 - 2열 레이아웃 (1~20 왼쪽, 21~40 오른쪽)
  */
 import sharp from "sharp";
 
 const NUM_QUESTIONS = 40;
 const CHOICES_PER_QUESTION = 4;
 
-// 표준 A4 300dpi 기준 답안 영역 비율 (OMR 카드 레이아웃)
-// 상단(이름/사번) ~40%, 하단 답안 영역 40%~95%
-const ANSWER_TOP = 0.38;
+// OMR 카드: 상단(이름/사번) ~55%, 답안 영역 55%~95%
+// 2열: 왼쪽 1~20번, 오른쪽 21~40번
+const ANSWER_TOP = 0.55;
 const ANSWER_BOTTOM = 0.95;
-const ANSWER_LEFT = 0.12;
-const ANSWER_RIGHT = 0.88;
+const ROWS_PER_COL = 20;
 
 function getBubblePositions(width: number, height: number) {
   const positions: { q: number; c: number; x: number; y: number }[] = [];
-  const rows = NUM_QUESTIONS;
-  const cols = CHOICES_PER_QUESTION;
-
-  const x0 = width * ANSWER_LEFT;
-  const x1 = width * ANSWER_RIGHT;
   const y0 = height * ANSWER_TOP;
   const y1 = height * ANSWER_BOTTOM;
+  const rowHeight = (y1 - y0) / ROWS_PER_COL;
 
-  const rowHeight = (y1 - y0) / rows;
-  const colWidth = (x1 - x0) / cols;
-
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      const x = x0 + colWidth * (c + 0.5);
+  // 왼쪽 열: 1~20번
+  const leftX0 = width * 0.08;
+  const leftX1 = width * 0.42;
+  const leftColWidth = (leftX1 - leftX0) / CHOICES_PER_QUESTION;
+  for (let r = 0; r < ROWS_PER_COL; r++) {
+    for (let c = 0; c < CHOICES_PER_QUESTION; c++) {
+      const x = leftX0 + leftColWidth * (c + 0.5);
       const y = y0 + rowHeight * (r + 0.5);
       positions.push({ q: r + 1, c: c + 1, x: Math.round(x), y: Math.round(y) });
     }
   }
+
+  // 오른쪽 열: 21~40번
+  const rightX0 = width * 0.52;
+  const rightX1 = width * 0.92;
+  const rightColWidth = (rightX1 - rightX0) / CHOICES_PER_QUESTION;
+  for (let r = 0; r < ROWS_PER_COL; r++) {
+    for (let c = 0; c < CHOICES_PER_QUESTION; c++) {
+      const x = rightX0 + rightColWidth * (c + 0.5);
+      const y = y0 + rowHeight * (r + 0.5);
+      positions.push({ q: ROWS_PER_COL + r + 1, c: c + 1, x: Math.round(x), y: Math.round(y) });
+    }
+  }
+
   return positions;
 }
 
-/** 버블 반경 추정 (이미지 크기에 비례) */
+/** 버블 반경 (샘플링 영역) */
 function getBubbleRadius(width: number, height: number): number {
   const minDim = Math.min(width, height);
-  return Math.max(8, Math.floor(minDim * 0.015));
+  return Math.max(12, Math.floor(minDim * 0.02));
 }
 
 /** 원형 영역 내 어두운 픽셀 비율 (raw 버퍼에서 샘플링) */
@@ -68,7 +77,7 @@ function getDarknessFromRaw(
       const bv = channels > 2 ? data[i + 2] : rv;
       const gray = 0.299 * rv + 0.587 * gv + 0.114 * bv;
       total++;
-      if (gray < 180) dark++;
+      if (gray < 200) dark++;
     }
   }
   return total > 0 ? dark / total : 0;
@@ -81,7 +90,7 @@ export interface OMRResult {
 
 export async function readOMRFromBuffer(
   buffer: Buffer,
-  filledThreshold = 0.4
+  filledThreshold = 0.32
 ): Promise<OMRResult> {
   const image = sharp(buffer);
   const meta = await image.metadata();

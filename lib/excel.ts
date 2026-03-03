@@ -83,6 +83,12 @@ export function gradeAnswers(
   return { score, correctCount, wrongCount, wrongQuestions };
 }
 
+/**
+ * 시트1에서 정답 키 추출.
+ * 지원 형식:
+ * - 형식 A: 한 행에 시험번호 + 40자리 정답 (예: 2024-01, 12341234...)
+ * - 형식 B: 40행, 각 행에 문제번호(1~40) + 답(1~4)
+ */
 export function parseAnswerKeyFromExcel(
   excelBuffer: Buffer,
   examCode: string
@@ -91,19 +97,37 @@ export function parseAnswerKeyFromExcel(
   const ws = wb.Sheets[wb.SheetNames[0]];
   if (!ws) return null;
 
-  const data = XLSX.utils.sheet_to_json<string[]>(ws, { header: 1 });
+  const data = XLSX.utils.sheet_to_json<string[]>(ws, { header: 1 }) as (string | number)[][];
   const target = String(examCode).trim();
 
-  for (const row of data as (string | number)[][]) {
+  // 형식 B: 40행 (문제번호 1~40, 시험정답 1~4)
+  const numRows = data.filter((r) => r && r.length >= 2).length;
+  const firstCol = data[1]?.[0];
+  const isFormatB =
+    numRows >= 40 &&
+    (firstCol === 1 || firstCol === "1" || Number(firstCol) === 1);
+
+  if (isFormatB) {
+    const answers: number[] = [];
+    for (let i = 1; i <= 40 && i < data.length; i++) {
+      const row = data[i];
+      if (!row || row.length < 2) break;
+      const ans = Number(row[1]);
+      answers.push(ans >= 1 && ans <= 4 ? ans : 1);
+    }
+    if (answers.length === 40) return answers;
+  }
+
+  // 형식 A: 한 행에 시험번호 + 40자리 정답
+  for (const row of data) {
     if (!row || row.length < 2) continue;
     const code = String(row[0] ?? "").trim();
     const keyStr = String(row[1] ?? "").trim();
-    if (code === target) {
+    if (code === target || (!target && keyStr.length >= 40)) {
       const digits = keyStr.match(/[1-4]/g);
       if (digits && digits.length >= 40) {
         return digits.slice(0, 40).map(Number);
       }
-      return null;
     }
   }
   return null;

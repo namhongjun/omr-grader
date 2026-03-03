@@ -1,0 +1,9 @@
+# OMR 카드 읽기 + 엑셀 채점
+opencv-python>=4.8.0
+numpy>=1.24.0
+openpyxl>=3.1.0
+PyYAML>=6.0
+
+# QR코드로 사번 인식 (카드에 QR이 있을 때)
+# pyzbar  # Windows는 바이너리 설치 필요 시 사용
+# 대안: opencv만으로 QR 디코딩 (OpenCV 4.x 내장)

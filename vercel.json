@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "app/api/grade/route.ts": {
+      "maxDuration": 300
+    }
+  }
+}
